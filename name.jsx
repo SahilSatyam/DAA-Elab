@@ -453,3 +453,346 @@ export default function AppLevelRetnRem() {
         </div>
     );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+///////////////////////////////
+
+
+import React, {useEffect, useState} from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import {MdsDataTableForAccounts, MdsTile, MdsIcon,MdsButton, MdsSwitch, MdsTabBar, MdsTileAccordion, MdsDescriptionList} from '@mds/react';
+import moment from 'moment-timezone';
+import jsPDF from "jspdf";
+import 'jspdf-autotable';
+import "../../styles/Reports/AsetLevelRetnRem.css";
+import RetentionRemediationReportConfig from "../../config/RetentionRemediationDashboard.json";
+
+export default function AsetLevelRetnRem() {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const asetLevelRetnRemData = location.state;
+    const [asetLevelfilteredData, setAsetLevelFilteredData] = useState([]);
+    const [datastoreCount, setDataStoreCount] = useState(0);
+    const [matchClassCodeCount, setMatchClassCodeCount] = useState(0);
+    const [mismatchClassCodeCount, setMismatchClassCodeCount] = useState(0);
+    const [dataStoreIDQuery, setDataStoreIDQuery] = useState("");
+    const [dataStoreNameQuery, setDataStoreNameQuery] = useState("");
+    const [classCodeIndicatorQuery, setClassCodeIndicatorQuery] = useState("");
+
+    useEffect(() => {
+        if (dataStoreIDQuery.trim() === "" &&
+            dataStoreNameQuery.trim() === "" &&
+            classCodeIndicatorQuery.trim() === "") {
+            setAsetLevelFilteredData(asetLevelRetnRemData);
+        } else {
+            const asetLevelfilteredData = asetLevelRetnRemData.filter(
+                (item) =>
+                    String(item["ASET_ID"]).toLowerCase()
+                        .startsWith(dataStoreIDQuery.toLowerCase()) &&
+                    String(item["ASET_NM"]).toLowerCase()
+                        .includes(dataStoreNameQuery.toLowerCase()) &&
+                    String(item["CLS_CD_COMPARISION_IND"]).toLowerCase()
+                        .startsWith(classCodeIndicatorQuery.toLowerCase())
+            );
+            setAsetLevelFilteredData(asetLevelfilteredData);
+        }
+    }, [asetLevelRetnRemData, dataStoreIDQuery, dataStoreNameQuery, classCodeIndicatorQuery]);
+
+    useEffect(() => {
+        const datastoreCount = asetLevelRetnRemData.length;
+        const matchClassCodeCount = asetLevelRetnRemData.filter((item) => item["CLS_CD_COMPARISION_IND"] === "Yes").length;
+        const mismatchClassCodeCount = asetLevelRetnRemData.filter((item) => item["CLS_CD_COMPARISION_IND"] === "No").length;
+        setDataStoreCount(datastoreCount);
+        setMatchClassCodeCount(matchClassCodeCount);
+        setMismatchClassCodeCount(mismatchClassCodeCount);
+    }, [asetLevelRetnRemData]);
+    
+    const mdsTileContent = [
+        { testid: "aset-level-retn-rem-dashboard-total-aset", title: "Total Datastores", calculations: datastoreCount },
+        { testid: "aset-level-retn-rem-dashboard-matching-aset", title: "Number of Datastores with Matching Class Code", calculations: matchClassCodeCount },
+        { testid: "aset-level-retn-rem-dashboard-not-matching-aset", title: "Number of Datastores with Mismatching Class Code", calculations: mismatchClassCodeCount },
+    ];
+
+    const reportGeneratedTime = moment.utc(asetLevelRetnRemData[0].CRE_TS).tz("America_New_York").format("DD MMMM YYYY HH:mm:ss") + ' EST';
+    const exportToPDF = (pdfData) => {
+        const doc = new jsPDF("landscape", "pt", "A2");
+        doc.setFontSize(20);
+        doc.setFont("Times New Roman");
+        const title = "Retention Remediation Report";
+        doc.text(title, 850, 30, { align: 'center' });
+        doc.setFontSize(14);
+        const refreshedDataText = "Report Generated On: " + reportGeneratedTime;
+        doc.text(refreshedDataText, 40, 30, { align: 'left' });
+
+        const headers = [['Application ID', 'Application Name', 'Data Store ID', 'Data Store Name', 'Purpose Class Code','Registration Status', 'Retention Country Name', 'Retention Event Date', 'Record Class Code (DAI)', 
+        'Retention Class Code (Datafit)',  'Data Store Has Name', 'Data Store Has Class Code', 'Class Code Comparison']];
+        const PDFData = pdfData.map(
+        row=> [row.APPL_SYS_ID, row.APPL_SYS_NM, row.ASET_ID, row.ASET_NM, row.PRPS_CLS_CD, row.RGST_STS_CD,
+            row.RETN_CNTRY_NM, row.EFF_TS, row.RCRD_CLS_CD, row.RETN_CLS_MV, row.HAS_DATA_STOR_NM, row.DATA_STOR_HAS_CLS_CD, row.CLS_CD_COMPARISION_IND]);
+
+        let content = {
+        startY: 50,
+        styles: {overflow: 'linebreak'},
+        head: headers,
+        body: PDFData
+        };
+
+        doc.setFontSize(12);
+        doc.autoTable(content);
+        doc.save("Retention Remediation Aset Level.pdf");
+    };
+
+    return (
+        <div className="aset-level-retn-rem-dashboard">
+            <div data-testid="aset-level-retn-rem-dashboard-title" className="aset-level-retn-rem-dashboard-title">
+                <div className="gotoAppLevel">
+                    <MdsIcon
+                        size="24"
+                        color="inverse"
+                        type="ico_chevron_circle_left"
+                        remove-horizontal-margin="false"
+                        onClick={() => navigate("/app-level-retn-rem-dashboard")}>
+                    </MdsIcon>
+                </div>
+                <p className="aset-level-retn-rem-dashboard-title-text">Retention Remediation Dashboard</p>
+            </div>
+            <div data-testid="top-line-aset-level" className="top-line-aset-level"></div>
+            <div className="aset-level-retn-rem-content">
+                <MdsTabBar
+                    id="mds-tab-bar--cmb"
+                    data-testid="aset-level-retn-rem-tab-bar"
+                    tabs={[
+                        { text: 'Data Store Information' },
+                        { text: 'Retention and Destruction Information and Create JIRA Story' }
+                    ]}
+                    >
+                    <p slot="panel-0">
+                        <div className="aset-level-retn-rem-data-store-info">
+                            <div className="aset-level-retn-rem-dashboard-tiles">
+                                {mdsTileContent.map((tile, index) => (
+                                    <MdsTile
+                                        key={index}
+                                        data-testid={tile.testid}
+                                        tileTitle={tile.title}
+                                        hideTitle={false}
+                                        interactive={false}
+                                        variant="classic"
+                                        horizontalPadding="regular"
+                                        backgroundColor="#000000"
+                                    >
+                                        <div slot="tile-content">{tile.calculations}</div>
+                                    </MdsTile>
+                                ))}
+                            </div>
+                            <div className="aset-level-retn-rem-dashboard-filters">
+                                <div className="searchbox">
+                                    <div className="search-input-container">
+                                        <input
+                                            name="databaseIDSearch"
+                                            placeholder="Search By Data Store ID"
+                                            value={dataStoreIDQuery}
+                                            onChange={(e) => {
+                                                setDataStoreIDQuery(e.target.value.toLowerCase());
+                                            }}
+                                        />
+                                        {dataStoreIDQuery && (
+                                            <button className="clear-button" onClick={() => setDataStoreIDQuery("")}>✖</button>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="searchbox">
+                                    <div className="search-input-container">
+                                        <input
+                                            name="databaseNameSearch"
+                                            placeholder="Search By Data Store Name"
+                                            value={dataStoreNameQuery}
+                                            onChange={(e) => {
+                                                setDataStoreNameQuery(e.target.value.toLowerCase());
+                                            }}
+                                        />
+                                        {dataStoreNameQuery && (
+                                            <button className="clear-button" onClick={() => setDataStoreNameQuery("")}>✖</button>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="class-code-comparison-filter">
+                                    <MdsSwitch
+                                        data-testid="aset-level-retn-rem-mds-switch"
+                                        label="Class Code Comparison Filter"
+                                        stateLabelOn="On"
+                                        stateLabelOff="Off"
+                                        onChange={() => {
+                                            classCodeIndicatorQuery === "No"? setClassCodeIndicatorQuery(""): setClassCodeIndicatorQuery("No");
+                                        }}
+                                    ></MdsSwitch>
+                                </div>
+                                <div className="aset-level-retn-rem-export-options">
+                                    <MdsButton
+                                        data-testid="aset-level-retn-rem-pdf-export-data-button"
+                                        text="PDF"
+                                        variant="secondary"
+                                        widthType="content"
+                                        type="button"
+                                        onClick={() => exportToPDF(asetLevelfilteredData)}
+                                        />
+                                </div>
+                            </div>
+                            <div className="aset-level-retn-rem-dashboard-app-info">
+                                <div className="aset-level-retn-rem-dashboard-app-name-heading" data-testid="aset-level-retn-rem-dashboard-app-name-heading">
+                                    <h1>{asetLevelRetnRemData[0]['APPL_SYS_ID']} : {asetLevelRetnRemData[0]['APPL_SYS_NM']}</h1>
+                                </div>
+                                <div className="aset-level-retn-rem-dashboard-app-owner-details" data-testid="aset-level-retn-rem-dashboard-app-owner-details">
+                                    <div className="aset-level-retn-rem-dashboard-app-owner">
+                                        <p>App Owner : {asetLevelRetnRemData[0]['APPL_OWNR_NM']},  {asetLevelRetnRemData[0]['APPL_OWNR_SID']}</p>
+                                    </div>  
+                                    <div className="aset-level-retn-rem-dashboard-info-owner">
+                                        <p>Info Owner : {asetLevelRetnRemData[0]['INFO_OWNR_NM']},  {asetLevelRetnRemData[0]['INFO_OWNR_SID']}</p>
+                                    </div>
+                                    <div className="aset-level-retn-rem-dashboard-data-owner">
+                                        <p>Data Owner : {asetLevelRetnRemData[0]['DATA_OWNR_NM']},  {asetLevelRetnRemData[0]['DATA_OWNR_SID']}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="top-line-aset-level"></div>
+                            <div className="aset-level-retn-rem-dashboard-datatable">
+                                <center>
+                                    <MdsDataTableForAccounts
+                                        data-testid="aset-level-retn-rem-dashboard-datatable"
+                                        caption="Aset Level Retention Remediation Dashboard"
+                                        hasVisibleCaption={false}
+                                        hasHoverColor={true}
+                                        mode="compact"
+                                        layout="column"
+                                        columnConfigs={RetentionRemediationReportConfig.AsetLevelRetentionRemediationReportColumns}
+                                        rowData={
+                                            asetLevelfilteredData.map((row) => [
+                                                    { value: String(row["APPL_SYS_ID"])},
+                                                    { value: String(row["APPL_SYS_NM"])},
+                                                    { value: row["ASET_ID"] ? String(row["ASET_ID"]) : "-" },
+                                                    { value: row["ASET_NM"] ? String(row["ASET_NM"]) : "-" },
+                                                    { value: row["PRPS_CLS_CD"] ? String(row["PRPS_CLS_CD"]) : "-" },
+                                                    { value: row["RGST_STS_CD"] ? String(row["RGST_STS_CD"]) : "-" },
+                                                    { value: row["RETN_CNTRY_NM"] ? String(row["RETN_CNTRY_NM"]) : "-" },
+                                                    { value: row["EFF_TS"] ? String(row["EFF_TS"]) : "-" },
+                                                    { value: row["RCRD_CLS_CD"] ? String(row["RCRD_CLS_CD"]) : "-" },
+                                                    { value: row["RETN_CLS_MV"] ? String(row["RETN_CLS_MV"]) : "-" },
+                                                    { value: row["HAS_DATA_STOR_NM"] ? String(row["HAS_DATA_STOR_NM"]) : "-" },
+                                                    { value: row["DATA_STOR_HAS_CLS_CD"] ? String(row["DATA_STOR_HAS_CLS_CD"]) : "-" },
+                                                    {value: row["CLS_CD_COMPARISION_IND"],
+                                                        alertMessage: {
+                                                            variant:
+                                                            String(row["CLS_CD_COMPARISION_IND"]) === "Yes" ? "success" : String(row["CLS_CD_COMPARISION_IND"]) === "No" ? "error" : "soft",
+                                                            title: "",
+                                                            accessibleTextIcon: String(row["CLS_CD_COMPARISION_IND"]) === "Yes" ? "success icon" : "error icon"}
+                                                    }
+                                                ]
+                                            )
+                                        }
+                                        nullStateMessage="No Data Found"
+                                        rowStyle="solid"
+                                    />
+                                </center>
+                            </div>
+                        </div>
+                    </p>
+                    <p slot="panel-1">
+                        <div className="aset-level-retn-rem-drd-info-and-jira">
+                            <div className="aset-level-retn-rem-drd-info">
+                                <div className="aset-level-retn-rem-drd-info-tiles">
+                                    <MdsTileAccordion
+                                        data-testid="mds-tile-accordion-for-eligibility-dates"
+                                        defaultOpen="true"
+                                        accordionItems={[
+                                            {
+                                            name: 'first',
+                                            label: 'Destruction Eligibility Dates'
+                                            },
+                                        ]}
+                                        >
+                                        <span slot="first">
+                                            <MdsDescriptionList
+                                                description-alignment="left"
+                                                item-layout="horizontal"
+                                                items={[
+                                                    {"term": "Calculated Earliest Destruction Eligible Date", "description": asetLevelRetnRemData[0]["CALC_ERLST_DESTR_ELIG_DT"]},
+                                                    {"term": "Overall Earliest Destruction Eligible Date", "description": asetLevelRetnRemData[0]["OVRL_ERLST_DESTR_ELIG_DT"]},
+                                                    {"term": "Time Remaining", "description": asetLevelRetnRemData[0]["TIME_REMAINING"]},
+                                                    {"term": "Has Destruction Eligible Data", "description": asetLevelRetnRemData[0]["HAS_DESTR_ELIG_DATA"]},
+                                                ]}>
+                                            </MdsDescriptionList>
+                                        </span>
+                                    </MdsTileAccordion>
+                                    <MdsTileAccordion
+                                        data-testid="mds-tile-accordion-for-extended-retention"
+                                        defaultOpen="true"
+                                        accordionItems={[
+                                            {
+                                            name: 'first',
+                                            label: 'Extended Retention'
+                                            },
+                                        ]}
+                                        >
+                                        <span slot="first">
+                                            <MdsDescriptionList
+                                                description-alignment="left"
+                                                item-layout="horizontal"
+                                                items={[
+                                                    {"term": "Approved Extended Retention", "description": asetLevelRetnRemData[0]["APPROVED_EXTENDED_RETENTION"]},
+                                                    {"term": "Extended Retention Date", "description": asetLevelRetnRemData[0]["EXTENDED_RETENTION_DT"] ? String( asetLevelRetnRemData[0]["EXTENDED_RETENTION_DT"]).replace("00:00:00", "") : asetLevelRetnRemData[0]["EXTENDED_RETENTION_DT"]},
+                                                ]}>
+                                            </MdsDescriptionList>
+                                        </span>
+                                    </MdsTileAccordion>
+                                    <MdsTileAccordion
+                                        data-testid="mds-tile-accordion-for-destruction-capability"
+                                        defaultOpen="true"
+                                        accordionItems={[
+                                            {
+                                            name: 'first',
+                                            label: 'Destruction Capability'
+                                            },
+                                        ]}
+                                        >
+                                        <span slot="first">
+                                            <MdsDescriptionList
+                                                description-alignment="left"
+                                                item-layout="horizontal"
+                                                items={[
+                                                    {"term": "Required Destruction Process Frequency", "description":  asetLevelRetnRemData[0]["REQ_DESTR_PROC_FREQ"]},
+                                                    {"term": "Destruction Enabled", "description": asetLevelRetnRemData[0]["DESTR_ENBL"]}
+                                                ]}>
+                                            </MdsDescriptionList>
+                                        </span>
+                                    </MdsTileAccordion>
+                                </div>
+                            </div>
+                            <div className="aset-level-retn-rem-jira">
+                                <p style={{textAlign:'center', margin: '10px', borderRadius:'5px'}}>
+                                    <MdsButton 
+                                        text="Create Jira and Attach Evidence"
+                                        variant="primary"
+                                        width-type="content"
+                                        type="button"
+                                        icon-position="leading"
+                                        small="false">
+                                    </MdsButton>
+                                </p>
+                            </div>
+                        </div>
+                    </p>
+                </MdsTabBar>
+            </div>
+        </div>
+    )
+}
